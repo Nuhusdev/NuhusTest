@@ -1,0 +1,34 @@
+# Import the Excel COM Object
+$Excel = New-Object -ComObject Excel.Application
+$Excel.Visible = $false  # Set to $true if you want Excel to be visible
+
+# Open the Excel workbook
+$Workbook = $Excel.Workbooks.Open("C:\path\to\your\domains.xlsx")  # Update the path
+
+# Select the first worksheet
+$Worksheet = $Workbook.Sheets.Item(1)
+
+# Get all the domain names in column A (assuming they start from row 1)
+$Domains = @()
+$row = 1
+while ($Worksheet.Cells.Item($row, 1).Value2 -ne $null) {
+    $Domains += $Worksheet.Cells.Item($row, 1).Value2
+    $row++
+}
+
+# Create or overwrite the results file
+$outputFile = "C:\path\to\your\dns_results.txt"  # Update the path
+"Querying DNS for the following domains:" | Out-File -FilePath $outputFile
+
+# Loop through each domain and run nslookup
+foreach ($domain in $Domains) {
+    "Querying: $domain" | Out-File -Append -FilePath $outputFile
+    nslookup $domain | Out-File -Append -FilePath $outputFile
+    "-----------------------------" | Out-File -Append -FilePath $outputFile
+}
+
+# Close the Excel workbook and Excel application
+$Workbook.Close()
+$Excel.Quit()
+
+Write-Host "Results saved to $outputFile"
