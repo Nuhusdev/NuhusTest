@@ -22,13 +22,24 @@ $Excel.Quit()
 
 # Create or overwrite the results file
 $outputFile = "C:\path\to\your\dns_results.txt"  # Update the path
-"Querying DNS for the following domains:" | Out-File -FilePath $outputFile
+"DNS Query Results:" | Out-File -FilePath $outputFile
 
-# Loop through each domain and run nslookup (no modification to domain names)
+# Loop through each domain and run nslookup (output DNS name and IP address)
 foreach ($domain in $Domains) {
-    "Querying: $domain" | Out-File -Append -FilePath $outputFile
-    nslookup $domain | Out-File -Append -FilePath $outputFile
-    "-----------------------------" | Out-File -Append -FilePath $outputFile
+    # Run nslookup and capture the output
+    $nslookupResult = nslookup $domain
+
+    # Extract DNS name (line containing "Name:")
+    $dnsName = ($nslookupResult | Select-String -Pattern "^Name:").Line.Trim()
+
+    # Extract IP address (line containing "Address:")
+    $ipAddress = ($nslookupResult | Select-String -Pattern "^Address:").Line.Trim()
+
+    # Only write to the file if both DNS name and IP address are found
+    if ($dnsName -and $ipAddress) {
+        # Write DNS name and IP address to the output file
+        "$dnsName - $ipAddress" | Out-File -Append -FilePath $outputFile
+    }
 }
 
 Write-Host "Results saved to $outputFile"
