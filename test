@@ -16,19 +16,19 @@ while ($Worksheet.Cells.Item($row, 1).Value2 -ne $null) {
     $row++
 }
 
+# Close the Excel workbook and Excel application
+$Workbook.Close()
+$Excel.Quit()
+
 # Create or overwrite the results file
 $outputFile = "C:\path\to\your\dns_results.txt"  # Update the path
 "Querying DNS for the following domains:" | Out-File -FilePath $outputFile
 
-# Loop through each domain and run nslookup
+# Loop through each domain and run nslookup (no modification to domain names)
 foreach ($domain in $Domains) {
     "Querying: $domain" | Out-File -Append -FilePath $outputFile
     nslookup $domain | Out-File -Append -FilePath $outputFile
     "-----------------------------" | Out-File -Append -FilePath $outputFile
 }
-
-# Close the Excel workbook and Excel application
-$Workbook.Close()
-$Excel.Quit()
 
 Write-Host "Results saved to $outputFile"
