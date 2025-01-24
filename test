@@ -1,45 +1,13 @@
-# Import the Excel COM Object
-$Excel = New-Object -ComObject Excel.Application
-$Excel.Visible = $false  # Set to $true if you want Excel to be visible
+# List of top-level folders to create
+$folders = @(
+    "folder1/",
+    "folder2/",
+    "folder3/",
+    "folder4/"
+)
 
-# Open the Excel workbook
-$Workbook = $Excel.Workbooks.Open("C:\path\to\your\domains.xlsx")  # Update the path
-
-# Select the first worksheet
-$Worksheet = $Workbook.Sheets.Item(1)
-
-# Get all the domain names in column A (assuming they start from row 1)
-$Domains = @()
-$row = 1
-while ($Worksheet.Cells.Item($row, 1).Value2 -ne $null) {
-    $Domains += $Worksheet.Cells.Item($row, 1).Value2
-    $row++
+# Create the folders (using a dummy file to simulate the folder)
+foreach ($folder in $folders) {
+    $blob = New-AzStorageBlob -Container $containerName -Context $context -File "C:\path\to\a\dummy\file.txt" -Blob $folder
+    Write-Host "Created folder: $folder"
 }
-
-# Close the Excel workbook and Excel application
-$Workbook.Close()
-$Excel.Quit()
-
-# Create or overwrite the results file
-$outputFile = "C:\path\to\your\dns_results.txt"  # Update the path
-"DNS Query Results:" | Out-File -FilePath $outputFile
-
-# Loop through each domain and run nslookup (output DNS name and IP address)
-foreach ($domain in $Domains) {
-    # Run nslookup and capture the output
-    $nslookupResult = nslookup $domain
-
-    # Extract DNS name (line containing "Name:")
-    $dnsName = ($nslookupResult | Select-String -Pattern "^Name:").Line.Trim()
-
-    # Extract IP address (line containing "Address:")
-    $ipAddress = ($nslookupResult | Select-String -Pattern "^Address:").Line.Trim()
-
-    # Only write to the file if both DNS name and IP address are found
-    if ($dnsName -and $ipAddress) {
-        # Write DNS name and IP address to the output file
-        "$dnsName - $ipAddress" | Out-File -Append -FilePath $outputFile
-    }
-}
-
-Write-Host "Results saved to $outputFile"
