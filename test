@@ -1,13 +1,19 @@
-# List of top-level folders to create
-$folders = @(
-    "folder1/",
-    "folder2/",
-    "folder3/",
-    "folder4/"
-)
+$containerName = "mycontainer"
+$storageAccount = "mystorageaccount"
+$folders = "folder1", "folder2", "folder3"
 
-# Create the folders (using a dummy file to simulate the folder)
 foreach ($folder in $folders) {
-    $blob = New-AzStorageBlob -Container $containerName -Context $context -File "C:\path\to\a\dummy\file.txt" -Blob $folder
+    # Generate a valid blob name with an empty content
+    $blobName = "$folder/empty.txt"  # You can use a placeholder file name like "empty.txt"
+    
+    # Upload an empty file to simulate the folder
+    $filePath = "C:\path\to\empty.txt"  # You can create a local empty file (or just reference an existing empty file)
+    if (-not (Test-Path $filePath)) {
+        New-Item -Path $filePath -ItemType File  # Create an empty file if it doesn't exist
+    }
+
+    # Upload the file to simulate the folder creation
+    az storage blob upload --container-name $containerName --name $blobName --file $filePath --account-name $storageAccount --auth-mode login
+    
     Write-Host "Created folder: $folder"
 }
