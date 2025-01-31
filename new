@@ -1,0 +1,13 @@
+$secrets = Get-AzKeyVaultSecret -VaultName <YourKeyVaultName> | Where-Object { $_.Attributes.Enabled -eq $true }
+
+$secretsList = $secrets | ForEach-Object {
+    $secretValue = Get-AzKeyVaultSecret -VaultName <YourKeyVaultName> -Name $_.Name
+    [PSCustomObject]@{
+        SecretName   = $secretValue.Name
+        SecretValue  = $secretValue.SecretValue
+        ExpiryDate   = $secretValue.Attributes.Expires
+    }
+}
+
+# Export the data to a CSV file
+$secretsList | Export-Csv -Path "enabled_secrets_with_expiry.csv" -NoTypeInformation
