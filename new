@@ -4,20 +4,20 @@ $KeyVaultName = "<Your-KeyVault-Name>"
 # Get all secret names
 $secrets = az keyvault secret list --vault-name $KeyVaultName --query "[].{Name:name}" --output json | ConvertFrom-Json
 
-# Create an array to store secret names and values
-$secretList = @()
+# Initialize an array to store formatted Terraform output
+$terraformOutput = @()
 
 # Loop through each secret to get its value
 foreach ($secret in $secrets) {
     $secretValue = az keyvault secret show --vault-name $KeyVaultName --name $secret.Name --query "value" --output tsv
-    $secretList += [PSCustomObject]@{
-        Name  = $secret.Name
-        Value = $secretValue
-    }
+    $terraformOutput += "`t{name: `"$($secret.Name)`", value: `"$($secretValue)`"}"
 }
 
-# Export to Excel
-$ExcelFilePath = "$PSScriptRoot\KeyVaultSecrets.xlsx"
-$secretList | Export-Excel -Path $ExcelFilePath -AutoSize -Title "Azure Key Vault Secrets"
+# Convert to Terraform list format
+$terraformFormatted = "[`n" + ($terraformOutput -join ",`n") + "`n]"
 
-Write-Host "Export completed: $ExcelFilePath"
+# Save to a Terraform file
+$TerraformFilePath = "$PSScriptRoot\secrets.tfvars"
+$terraformFormatted | Out-File -Encoding utf8 -FilePath $TerraformFilePath
+
+Write-Host "Terraform variables file created: $TerraformFilePath"
