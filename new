@@ -1,13 +1,23 @@
-$secrets = Get-AzKeyVaultSecret -VaultName <YourKeyVaultName> | Where-Object { $_.Attributes.Enabled -eq $true }
+# Define Key Vault Name
+$KeyVaultName = "<Your-KeyVault-Name>"
 
-$secretsList = $secrets | ForEach-Object {
-    $secretValue = Get-AzKeyVaultSecret -VaultName <YourKeyVaultName> -Name $_.Name
-    [PSCustomObject]@{
-        SecretName   = $secretValue.Name
-        SecretValue  = $secretValue.SecretValue
-        ExpiryDate   = $secretValue.Attributes.Expires
+# Get all secret names
+$secrets = az keyvault secret list --vault-name $KeyVaultName --query "[].{Name:name}" --output json | ConvertFrom-Json
+
+# Create an array to store secret names and values
+$secretList = @()
+
+# Loop through each secret to get its value
+foreach ($secret in $secrets) {
+    $secretValue = az keyvault secret show --vault-name $KeyVaultName --name $secret.Name --query "value" --output tsv
+    $secretList += [PSCustomObject]@{
+        Name  = $secret.Name
+        Value = $secretValue
     }
 }
 
-# Export the data to a CSV file
-$secretsList | Export-Csv -Path "enabled_secrets_with_expiry.csv" -NoTypeInformation
+# Export to Excel
+$ExcelFilePath = "$PSScriptRoot\KeyVaultSecrets.xlsx"
+$secretList | Export-Excel -Path $ExcelFilePath -AutoSize -Title "Azure Key Vault Secrets"
+
+Write-Host "Export completed: $ExcelFilePath"
