@@ -12,5 +12,12 @@ try {
 
 
 
+$destVaultName = "<TargetKeyVault>"
+$certName = "<CertificateName>"
+$certPath = "C:\Temp\cert.pfx"
 
-Import-AzKeyVaultCertificate -VaultName "<TargetKeyVault>" -Name "<CertificateName>" -FilePath "cert.pfx"
+# Import the certificate into the target Key Vault
+Import-AzKeyVaultCertificate -VaultName $destVaultName -Name $certName -FilePath $certPath
+
+Write-Host "Certificate imported to $destVaultName as $certName"
+
