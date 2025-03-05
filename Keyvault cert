@@ -1,7 +1,16 @@
-$cert = Get-AzKeyVaultCertificate -VaultName "<SourceKeyVault>" -Name "<CertificateName>"
-$secret = Get-AzKeyVaultSecret -VaultName "<SourceKeyVault>" -Name $cert.Name
-$pfxBytes = [Convert]::FromBase64String($secret.SecretValueText)
-[System.IO.File]::WriteAllBytes("cert.pfx", $pfxBytes)
+try {
+    $cert = Get-AzKeyVaultCertificate -VaultName "<SourceKeyVault>" -Name "<CertificateName>"
+    $secret = Get-AzKeyVaultSecret -VaultName "<SourceKeyVault>" -Name $cert.Name
+    $pfxBytes = [Convert]::FromBase64String($secret.SecretValueText)
+
+    [System.IO.File]::WriteAllBytes("C:\Temp\cert.pfx", $pfxBytes)
+    Write-Host "Certificate exported to C:\Temp\cert.pfx"
+} catch {
+    Write-Host "Error exporting certificate: $_" -ForegroundColor Red
+}
+
+
+
 
 
 Import-AzKeyVaultCertificate -VaultName "<TargetKeyVault>" -Name "<CertificateName>" -FilePath "cert.pfx"
