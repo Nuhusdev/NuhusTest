@@ -1,19 +1,31 @@
-$containerName = "mycontainer"
+# Define storage account and containers
 $storageAccount = "mystorageaccount"
+$containers = "container1", "container2", "container3"
 $folders = "folder1", "folder2", "folder3"
 
-foreach ($folder in $folders) {
-    # Generate a valid blob name with an empty content
-    $blobName = "$folder/empty.txt"  # You can use a placeholder file name like "empty.txt"
-    
-    # Upload an empty file to simulate the folder
-    $filePath = "C:\path\to\empty.txt"  # You can create a local empty file (or just reference an existing empty file)
-    if (-not (Test-Path $filePath)) {
-        New-Item -Path $filePath -ItemType File  # Create an empty file if it doesn't exist
-    }
+# Define empty file path (used to simulate folders)
+$filePath = "C:\path\to\empty.txt"
 
-    # Upload the file to simulate the folder creation
-    az storage blob upload --container-name $containerName --name $blobName --file $filePath --account-name $storageAccount --auth-mode login
-    
-    Write-Host "Created folder: $folder"
+# Ensure the empty file exists
+if (-not (Test-Path $filePath)) {
+    New-Item -Path $filePath -ItemType File | Out-Null  # Create an empty file if it doesn't exist
 }
+
+# Loop through each container
+foreach ($container in $containers) {
+    Write-Host "Processing container: $container"
+    
+    # Ensure the container exists
+    az storage container create --name $container --account-name $storageAccount --auth-mode login
+    
+    # Loop through each folder and create an empty blob to simulate the folder structure
+    foreach ($folder in $folders) {
+        $blobName = "$folder/empty.txt"  # Placeholder file to mimic folder structure
+        
+        az storage blob upload --container-name $container --name $blobName --file $filePath --account-name $storageAccount --auth-mode login
+        
+        Write-Host "Created folder: $folder in container: $container"
+    }
+}
+
+Write-Host "Folder structure created successfully in all containers."
