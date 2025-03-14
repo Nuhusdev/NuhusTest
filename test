@@ -1,7 +1,13 @@
 # Define storage account and containers
 $storageAccount = "mystorageaccount"
 $containers = "container1", "container2", "container3"
-$folders = "folder1", "folder2", "folder3"
+
+# Define subfolders for each existing parent folder
+$subfolders = @{
+    "folder1" = @("subfolderA", "subfolderB");
+    "folder2" = @("subfolderX", "subfolderY");
+    "folder3" = @("subfolderM", "subfolderN")
+}
 
 # Define empty file path (used to simulate folders)
 $filePath = "C:\path\to\empty.txt"
@@ -18,14 +24,17 @@ foreach ($container in $containers) {
     # Ensure the container exists
     az storage container create --name $container --account-name $storageAccount --auth-mode login
     
-    # Loop through each folder and create an empty blob to simulate the folder structure
-    foreach ($folder in $folders) {
-        $blobName = "$folder/empty.txt"  # Placeholder file to mimic folder structure
+    # Loop through each parent folder
+    foreach ($parentFolder in $subfolders.Keys) {
         
-        az storage blob upload --container-name $container --name $blobName --file $filePath --account-name $storageAccount --auth-mode login
-        
-        Write-Host "Created folder: $folder in container: $container"
+        # Loop through subfolders under each parent folder
+        foreach ($subFolder in $subfolders[$parentFolder]) {
+            $subFolderBlobName = "$parentFolder/$subFolder/empty.txt"
+            
+            az storage blob upload --container-name $container --name $subFolderBlobName --file $filePath --account-name $storageAccount --auth-mode login
+            Write-Host "Created subfolder: $subFolder under $parentFolder in container: $container"
+        }
     }
 }
 
-Write-Host "Folder structure created successfully in all containers."
+Write-Host "Subfolder structure added successfully in all containers."
