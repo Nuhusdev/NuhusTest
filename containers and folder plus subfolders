@@ -1,0 +1,56 @@
+## This will create new containers if you add new container name and folders plus subfolders
+
+# Define storage account and containers
+$storageAccount = "mystorageaccount"
+$containers = @("container1", "container2", "container3", "newcontainer")  # Add new containers dynamically
+
+# Define top-level folders
+$folders = @("folder1/", "folder2/", "folder3/", "folder4/")
+
+# Define subfolders for each existing parent folder
+$subfolders = @{
+    "folder1" = @("subfolderA", "subfolderB")
+    "folder2" = @("subfolderX", "subfolderY")
+    "folder3" = @("subfolderM", "subfolderN")
+}
+
+# Define empty file path (used to simulate folders)
+$filePath = "C:\path\to\empty.txt"
+
+# Ensure the empty file exists
+if (-not (Test-Path $filePath)) {
+    New-Item -Path $filePath -ItemType File | Out-Null  # Create an empty file if it doesn't exist
+}
+
+# Get the list of existing containers
+$existingContainers = az storage container list --account-name $storageAccount --auth-mode login --query "[].name" --output tsv
+
+# Loop through each container
+foreach ($container in $containers) {
+    if ($existingContainers -contains $container) {
+        Write-Host "Container '$container' already exists. Skipping creation."
+    } else {
+        Write-Host "Creating new container: $container"
+        az storage container create --name $container --account-name $storageAccount --auth-mode login
+    }
+
+    # Create top-level folders
+    foreach ($folder in $folders) {
+        $folderBlobName = "$folder/empty.txt"
+        
+        az storage blob upload --container-name $container --name $folderBlobName --file $filePath --account-name $storageAccount --auth-mode login
+        Write-Host "Created folder: $folder in container: $container"
+    }
+
+    # Create subfolders under each parent folder
+    foreach ($parentFolder in $subfolders.Keys) {
+        foreach ($subFolder in $subfolders[$parentFolder]) {
+            $subFolderBlobName = "$parentFolder/$subFolder/empty.txt"
+            
+            az storage blob upload --container-name $container --name $subFolderBlobName --file $filePath --account-name $storageAccount --auth-mode login
+            Write-Host "Created subfolder: $subFolder under $parentFolder in container: $container"
+        }
+    }
+}
+
+Write-Host "Folder structure updated successfully in all containers."
