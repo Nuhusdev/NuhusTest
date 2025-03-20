@@ -1,0 +1,62 @@
+provider "azurerm" {
+  features {}
+}
+
+# Define Storage Account
+resource "azurerm_storage_account" "storage" {
+  name                     = "mystorageaccount"
+  resource_group_name      = "my-resource-group"
+  location                 = "eastus"
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+}
+
+# Define Storage Containers
+variable "containers" {
+  default = ["container1", "container2", "container3", "newcontainer"]
+}
+
+resource "azurerm_storage_container" "containers" {
+  for_each              = toset(var.containers)
+  name                  = each.key
+  storage_account_name  = azurerm_storage_account.storage.name
+  container_access_type = "private"
+}
+
+# Define folder structure (simulated with empty blobs)
+variable "folders" {
+  default = ["folder1/", "folder2/", "folder3/", "folder4/"]
+}
+
+variable "subfolders" {
+  default = {
+    "folder1" = ["subfolderA", "subfolderB"]
+    "folder2" = ["subfolderX", "subfolderY"]
+    "folder3" = ["subfolderM", "subfolderN"]
+  }
+}
+
+# Upload empty blobs to simulate top-level folders
+resource "azurerm_storage_blob" "top_level_folders" {
+  for_each               = { for idx, folder in var.folders : folder => idx }
+  name                   = "${each.key}empty.txt"
+  storage_account_name   = azurerm_storage_account.storage.name
+  storage_container_name = azurerm_storage_container.containers["container1"].name  # Adjust container as needed
+  type                   = "Block"
+  source_content         = ""  # Creates an empty file in Azure Storage
+}
+
+# Upload empty blobs to simulate subfolders
+resource "azurerm_storage_blob" "subfolders" {
+  for_each = merge([
+    for parent, subs in var.subfolders : {
+      for sub in subs : "${parent}/${sub}/empty.txt" => parent
+    }
+  ]...)
+
+  name                   = each.key
+  storage_account_name   = azurerm_storage_account.storage.name
+  storage_container_name = azurerm_storage_container.containers["container1"].name  # Adjust container as needed
+  type                   = "Block"
+  source_content         = ""  # Creates an empty file directly in Azure
+}
