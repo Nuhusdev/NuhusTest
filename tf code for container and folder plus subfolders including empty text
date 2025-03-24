@@ -1,30 +1,35 @@
+To prevent Terraform from making changes to existing containers, folders, and subfolders (i.e., to make the configuration idempotent), we can leverage Terraform's lifecycle block with ignore_changes or use a more precise approach by checking for existence before creation. However, since Terraform doesn't natively "check" for blob existence without external data sources, we'll focus on ensuring the configuration doesn't modify existing resources unnecessarily.
+
+Here’s how we can modify the configuration:
+
+Use lifecycle to ignore changes to blob content (though this is less relevant for empty files).
+Rely on Terraform's default behavior: if a blob with the same name exists, it won't be recreated unless its properties change.
+Assume the storage account module handles the container existence check.
+Updated Terraform Configuration
+hcl
+
+Collapse
+
+Wrap
+
+Copy
 provider "azurerm" {
   features {}
 }
 
-# Reference existing storage account from module
-variable "storage_account_name" {
-  default = "mystorageaccount"  # Change if your module provides an output
-}
-
-# Define Storage Containers
+# Variables
 variable "containers" {
+  type    = list(string)
   default = ["container1", "container2", "container3", "newcontainer"]
 }
 
-resource "azurerm_storage_container" "containers" {
-  for_each              = toset(var.containers)
-  name                  = each.key
-  storage_account_name  = module.storage_account.name  # Reference existing module
-  container_access_type = "private"
-}
-
-# Define folder structure
 variable "folders" {
-  default = ["folder1/", "folder2/", "folder3/", "folder4/"]
+  type    = list(string)
+  default = ["folder1", "folder2", "folder3", "folder4"]
 }
 
 variable "subfolders" {
+  type = map(list(string))
   default = {
     "folder1" = ["subfolderA", "subfolderB"]
     "folder2" = ["subfolderX", "subfolderY"]
@@ -32,46 +37,79 @@ variable "subfolders" {
   }
 }
 
-# Upload empty blobs to simulate top-level folders
-resource "azurerm_storage_blob" "top_level_folders" {
-  for_each = { for folder in var.folders : folder => folder }
+# Storage Containers
+resource "azurerm_storage_container" "containers" {
+  for_each             = toset(var.containers)
+  name                 = each.value
+  storage_account_name = module.storage_account.name  # Using existing module
 
-  name                   = "${each.key}empty.txt"
-  storage_account_name   = module.storage_account.name  # Reference existing module
-  storage_container_name = azurerm_storage_container.containers["container1"].name  # Adjust container if needed
-  type                   = "Block"
-  source_content         = ""
-
+  # Prevent recreation or updates to existing containers
   lifecycle {
-    ignore_changes = [source_content]
+    # Ignore changes to properties that might differ if already exists
+    ignore_changes = [
+      container_access_type  # If it was set differently outside Terraform
+    ]
   }
 }
 
-# Upload empty blobs to simulate subfolders in all containers
-resource "azurerm_storage_blob" "subfolders" {
-  for_each = { 
-    for container in var.containers : 
-    merge(
-      { for parent, subs in var.subfolders : 
-        merge(
-          { for sub in subs : "${container}_${parent}_${sub}" => {
-              container = container
-              path      = "${parent}/${sub}/empty.txt"
-            }
-          }
-        )
+# Top-level folders with empty.txt in ALL containers
+resource "azurerm_storage_blob" "top_level_folders" {
+  for_each = flatten([
+    for container in var.containers : [
+      for folder in var.folders : {
+        container = container
+        folder    = folder
+        path      = "${folder}/empty.txt"
       }
-    ) 
-  }
+    ]
+  ])
 
-  name                   = each.value.path  # Path to the simulated folder
-  storage_account_name   = module.storage_account.name  # Reference existing storage module
+  name                   = each.value.path
+  storage_account_name   = module.storage_account.name
   storage_container_name = azurerm_storage_container.containers[each.value.container].name
   type                   = "Block"
+  content_type           = "text/plain"
   source_content         = ""
 
+  # Prevent updates to existing blobs
   lifecycle {
-    ignore_changes = [source_content]
+    ignore_changes = [
+      source_content,  # Ignore if someone modified the empty.txt
+      content_type     # Ignore if content type was changed
+    ]
+    # Prevent recreation if it already exists with same name
+    create_before_destroy = false
   }
 }
 
+# Subfolders with empty.txt in ALL containers
+resource "azurerm_storage_blob" "subfolders" {
+  for_each = flatten([
+    for container in var.containers : [
+      for parent, subs in var.subfolders : [
+        for sub in subs : {
+          container = container
+          parent    = parent
+          subfolder = sub
+          path      = "${parent}/${sub}/empty.txt"
+        }
+      ]
+    ]
+  ])
+
+  name                   = each.value.path
+  storage_account_name   = module.storage_account.name
+  storage_container_name = azurerm_storage_container.containers[each.value.container].name
+  type                   = "Block"
+  content_type           = "text/plain"
+  source_content         = ""
+
+  # Prevent updates to existing blobs
+  lifecycle {
+    ignore_changes = [
+      source_content,
+      content_type
+    ]
+    create_before_destroy = false
+  }
+}
