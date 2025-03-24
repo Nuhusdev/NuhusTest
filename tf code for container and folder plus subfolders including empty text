@@ -54,14 +54,17 @@ resource "azurerm_storage_blob" "subfolders" {
     merge({
       for parent, subs in var.subfolders : 
       merge({
-        for sub in subs : "${container}/${parent}/${sub}/empty.txt" => container
+        for sub in subs : "${container}_${parent}_${sub}" => {
+          container = container
+          path      = "${parent}/${sub}/empty.txt"
+        }
       })
     })
   }
 
-  name                   = replace(each.key, "${each.value}/", "")  # Remove container prefix
-  storage_account_name   = module.storage_account.name  # Reference existing module
-  storage_container_name = azurerm_storage_container.containers[each.value].name
+  name                   = each.value.path  # Path to the simulated folder
+  storage_account_name   = module.storage_account.name  # Reference existing storage module
+  storage_container_name = azurerm_storage_container.containers[each.value.container].name
   type                   = "Block"
   source_content         = ""
 
