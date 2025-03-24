@@ -49,16 +49,20 @@ resource "azurerm_storage_blob" "top_level_folders" {
 
 # Upload empty blobs to simulate subfolders in all containers
 resource "azurerm_storage_blob" "subfolders" {
-  for_each = merge([
-    for container in var.containers : {
-      for parent, subs in var.subfolders : {
-        for sub in subs : "${container}_${parent}_${sub}" => {
-          container = container
-          path      = "${parent}/${sub}/empty.txt"
-        }
+  for_each = { 
+    for container in var.containers : 
+    merge(
+      { for parent, subs in var.subfolders : 
+        merge(
+          { for sub in subs : "${container}_${parent}_${sub}" => {
+              container = container
+              path      = "${parent}/${sub}/empty.txt"
+            }
+          }
+        )
       }
-    }
-  ]...)
+    ) 
+  }
 
   name                   = each.value.path  # Path to the simulated folder
   storage_account_name   = module.storage_account.name  # Reference existing storage module
@@ -70,3 +74,4 @@ resource "azurerm_storage_blob" "subfolders" {
     ignore_changes = [source_content]
   }
 }
+
