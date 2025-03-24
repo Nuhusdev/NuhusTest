@@ -23,11 +23,12 @@ resource "azurerm_storage_container" "containers" {
   container_access_type = "private"
 }
 
-# Define folder structure (simulated with empty blobs)
+# Define top-level folders
 variable "folders" {
-  default = ["folder1/", "folder2/", "folder3/", "folder4/"]
+  default = ["folder1", "folder2", "folder3", "folder4"]
 }
 
+# Define subfolders under each top-level folder
 variable "subfolders" {
   default = {
     "folder1" = ["subfolderA", "subfolderB"]
@@ -36,27 +37,43 @@ variable "subfolders" {
   }
 }
 
-# Upload empty blobs to simulate top-level folders
+# Create top-level folders (simulated with empty blobs) inside all containers
 resource "azurerm_storage_blob" "top_level_folders" {
-  for_each               = { for idx, folder in var.folders : folder => idx }
-  name                   = "${each.key}empty.txt"
-  storage_account_name   = azurerm_storage_account.storage.name
-  storage_container_name = azurerm_storage_container.containers["container1"].name  # Adjust container as needed
-  type                   = "Block"
-  source_content         = ""  # Creates an empty file in Azure Storage
+  for_each = {
+    for container in var.containers : container => container
+  }
+
+  # Loop through each folder and create an empty blob to simulate the folder
+  for folder in var.folders : {
+    name                   = "${folder}empty.txt"
+    storage_account_name   = azurerm_storage_account.storage.name
+    storage_container_name = azurerm_storage_container.containers[each.key].name
+    type                   = "Block"
+    source_content         = ""
+
+    lifecycle {
+      ignore_changes = [source_content]  # Prevents Terraform from overwriting existing files
+    }
+  }
 }
 
-# Upload empty blobs to simulate subfolders
+# Create subfolders inside all containers
 resource "azurerm_storage_blob" "subfolders" {
   for_each = merge([
-    for parent, subs in var.subfolders : {
-      for sub in subs : "${parent}/${sub}/empty.txt" => parent
+    for container in var.containers : {
+      for parent, subs in var.subfolders : {
+        for sub in subs : "${container}/${parent}/${sub}/empty.txt" => container
+      }
     }
   ]...)
 
-  name                   = each.key
+  name                   = replace(each.key, "${each.value}/", "")  # Remove container prefix
   storage_account_name   = azurerm_storage_account.storage.name
-  storage_container_name = azurerm_storage_container.containers["container1"].name  # Adjust container as needed
+  storage_container_name = azurerm_storage_container.containers[each.value].name
   type                   = "Block"
-  source_content         = ""  # Creates an empty file directly in Azure
+  source_content         = ""
+
+  lifecycle {
+    ignore_changes = [source_content]  # Ensures Terraform does not overwrite existing files
+  }
 }
