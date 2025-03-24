@@ -2,13 +2,9 @@ provider "azurerm" {
   features {}
 }
 
-# Define Storage Account
-resource "azurerm_storage_account" "storage" {
-  name                     = "mystorageaccount"
-  resource_group_name      = "my-resource-group"
-  location                 = "eastus"
-  account_tier             = "Standard"
-  account_replication_type = "LRS"
+# Reference existing storage account from module
+variable "storage_account_name" {
+  default = "mystorageaccount"  # Change if your module provides an output
 }
 
 # Define Storage Containers
@@ -19,16 +15,15 @@ variable "containers" {
 resource "azurerm_storage_container" "containers" {
   for_each              = toset(var.containers)
   name                  = each.key
-  storage_account_name  = azurerm_storage_account.storage.name
+  storage_account_name  = module.storage_account.name  # Reference existing module
   container_access_type = "private"
 }
 
-# Define top-level folders
+# Define folder structure
 variable "folders" {
-  default = ["folder1", "folder2", "folder3", "folder4"]
+  default = ["folder1/", "folder2/", "folder3/", "folder4/"]
 }
 
-# Define subfolders under each top-level folder
 variable "subfolders" {
   default = {
     "folder1" = ["subfolderA", "subfolderB"]
@@ -37,43 +32,40 @@ variable "subfolders" {
   }
 }
 
-# Create top-level folders (simulated with empty blobs) inside all containers
+# Upload empty blobs to simulate top-level folders
 resource "azurerm_storage_blob" "top_level_folders" {
-  for_each = {
-    for container in var.containers : container => container
-  }
+  for_each = { for folder in var.folders : folder => folder }
 
-  # Loop through each folder and create an empty blob to simulate the folder
-  for folder in var.folders : {
-    name                   = "${folder}empty.txt"
-    storage_account_name   = azurerm_storage_account.storage.name
-    storage_container_name = azurerm_storage_container.containers[each.key].name
-    type                   = "Block"
-    source_content         = ""
+  name                   = "${each.key}empty.txt"
+  storage_account_name   = module.storage_account.name  # Reference existing module
+  storage_container_name = azurerm_storage_container.containers["container1"].name  # Adjust container if needed
+  type                   = "Block"
+  source_content         = ""
 
-    lifecycle {
-      ignore_changes = [source_content]  # Prevents Terraform from overwriting existing files
-    }
+  lifecycle {
+    ignore_changes = [source_content]
   }
 }
 
-# Create subfolders inside all containers
+# Upload empty blobs to simulate subfolders in all containers
 resource "azurerm_storage_blob" "subfolders" {
-  for_each = merge([
-    for container in var.containers : {
-      for parent, subs in var.subfolders : {
+  for_each = { 
+    for container in var.containers : 
+    merge({
+      for parent, subs in var.subfolders : 
+      merge({
         for sub in subs : "${container}/${parent}/${sub}/empty.txt" => container
-      }
-    }
-  ]...)
+      })
+    })
+  }
 
   name                   = replace(each.key, "${each.value}/", "")  # Remove container prefix
-  storage_account_name   = azurerm_storage_account.storage.name
+  storage_account_name   = module.storage_account.name  # Reference existing module
   storage_container_name = azurerm_storage_container.containers[each.value].name
   type                   = "Block"
   source_content         = ""
 
   lifecycle {
-    ignore_changes = [source_content]  # Ensures Terraform does not overwrite existing files
+    ignore_changes = [source_content]
   }
 }
