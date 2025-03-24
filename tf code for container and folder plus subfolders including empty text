@@ -1,31 +1,22 @@
-To prevent Terraform from making changes to existing containers, folders, and subfolders (i.e., to make the configuration idempotent), we can leverage Terraform's lifecycle block with ignore_changes or use a more precise approach by checking for existence before creation. However, since Terraform doesn't natively "check" for blob existence without external data sources, we'll focus on ensuring the configuration doesn't modify existing resources unnecessarily.
-
-Here’s how we can modify the configuration:
-
-Use lifecycle to ignore changes to blob content (though this is less relevant for empty files).
-Rely on Terraform's default behavior: if a blob with the same name exists, it won't be recreated unless its properties change.
-Assume the storage account module handles the container existence check.
-Updated Terraform Configuration
-hcl
-
-Collapse
-
-Wrap
-
-Copy
 provider "azurerm" {
   features {}
+}
+
+# Storage Account Module
+module "storage_account" {
+  source = "github.com/<username>/<repo>.git"  # Replace with your actual GitHub path
+  # Add required module variables here
 }
 
 # Variables
 variable "containers" {
   type    = list(string)
-  default = ["container1", "container2", "container3", "newcontainer"]
+  default = ["container1", "container2", "container3", "newcontainer"]  # 18 elements in your case
 }
 
 variable "folders" {
   type    = list(string)
-  default = ["folder1", "folder2", "folder3", "folder4"]
+  default = ["folder1", "folder2", "folder3", "folder4"]  # 13 elements in your case
 }
 
 variable "subfolders" {
@@ -41,28 +32,26 @@ variable "subfolders" {
 resource "azurerm_storage_container" "containers" {
   for_each             = toset(var.containers)
   name                 = each.value
-  storage_account_name = module.storage_account.name  # Using existing module
+  storage_account_name = module.storage_account.name
 
-  # Prevent recreation or updates to existing containers
   lifecycle {
-    # Ignore changes to properties that might differ if already exists
-    ignore_changes = [
-      container_access_type  # If it was set differently outside Terraform
-    ]
+    prevent_destroy = true
   }
 }
 
 # Top-level folders with empty.txt in ALL containers
 resource "azurerm_storage_blob" "top_level_folders" {
-  for_each = flatten([
-    for container in var.containers : [
-      for folder in var.folders : {
-        container = container
-        folder    = folder
-        path      = "${folder}/empty.txt"
-      }
-    ]
-  ])
+  for_each = {
+    for item in flatten([
+      for container in var.containers : [
+        for folder in var.folders : {
+          container = container
+          folder    = folder
+          path      = "${folder}/empty.txt"
+        }
+      ]
+    ]) : "${item.container}_${item.folder}" => item
+  }
 
   name                   = each.value.path
   storage_account_name   = module.storage_account.name
@@ -71,31 +60,31 @@ resource "azurerm_storage_blob" "top_level_folders" {
   content_type           = "text/plain"
   source_content         = ""
 
-  # Prevent updates to existing blobs
   lifecycle {
     ignore_changes = [
-      source_content,  # Ignore if someone modified the empty.txt
-      content_type     # Ignore if content type was changed
+      source_content,
+      content_type
     ]
-    # Prevent recreation if it already exists with same name
     create_before_destroy = false
   }
 }
 
 # Subfolders with empty.txt in ALL containers
 resource "azurerm_storage_blob" "subfolders" {
-  for_each = flatten([
-    for container in var.containers : [
-      for parent, subs in var.subfolders : [
-        for sub in subs : {
-          container = container
-          parent    = parent
-          subfolder = sub
-          path      = "${parent}/${sub}/empty.txt"
-        }
+  for_each = {
+    for item in flatten([
+      for container in var.containers : [
+        for parent, subs in var.subfolders : [
+          for sub in subs : {
+            container = container
+            parent    = parent
+            subfolder = sub
+            path      = "${parent}/${sub}/empty.txt"
+          }
+        ]
       ]
-    ]
-  ])
+    ]) : "${item.container}_${item.parent}_${item.subfolder}" => item
+  }
 
   name                   = each.value.path
   storage_account_name   = module.storage_account.name
@@ -104,7 +93,6 @@ resource "azurerm_storage_blob" "subfolders" {
   content_type           = "text/plain"
   source_content         = ""
 
-  # Prevent updates to existing blobs
   lifecycle {
     ignore_changes = [
       source_content,
