@@ -1,12 +1,15 @@
-#!/bin/bash
+# Set the storage account name
+$STORAGE_ACCOUNT = "yourstorageaccountname"
 
-STORAGE_ACCOUNT="yourstorageaccountname"
-ACCOUNT_KEY=$(az storage account keys list --account-name $STORAGE_ACCOUNT --query "[0].value" -o tsv)
+# Get the storage account key
+$ACCOUNT_KEY = az storage account keys list --account-name $STORAGE_ACCOUNT --query "[0].value" -o tsv
+if (-not $ACCOUNT_KEY) {
+    Write-Error "Failed to retrieve account key. Check STORAGE_ACCOUNT and permissions."
+    exit 1
+}
 
-for container in $(az storage container list --account-name $STORAGE_ACCOUNT --account-key $ACCOUNT_KEY --query "[].name" -o tsv); do
-  echo "Deleting container: $container"
-  az storage container delete --name $container --account-name $STORAGE_ACCOUNT --account-key $ACCOUNT_KEY --yes
-done
-
-echo "All containers deleted. Verifying..."
-az storage container list --account-name $STORAGE_ACCOUNT --account-key $ACCOUNT_KEY --output table
+# Get the list of containers and loop through them
+$containers = az storage container list --account-name $STORAGE_ACCOUNT --account-key $ACCOUNT_KEY --query "[].name" -o tsv
+foreach ($container in $containers) {
+    Write-Host "Deleting container: $container"
+    az storage container delete --name $container --account-name $STORAGE_ACCOUNT --account
