@@ -1,4 +1,12 @@
+#!/bin/bash
+
+STORAGE_ACCOUNT="yourstorageaccountname"
+ACCOUNT_KEY=$(az storage account keys list --account-name $STORAGE_ACCOUNT --query "[0].value" -o tsv)
+
 for container in $(az storage container list --account-name $STORAGE_ACCOUNT --account-key $ACCOUNT_KEY --query "[].name" -o tsv); do
   echo "Deleting container: $container"
   az storage container delete --name $container --account-name $STORAGE_ACCOUNT --account-key $ACCOUNT_KEY --yes
 done
+
+echo "All containers deleted. Verifying..."
+az storage container list --account-name $STORAGE_ACCOUNT --account-key $ACCOUNT_KEY --output table
