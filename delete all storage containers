@@ -1,0 +1,9 @@
+STORAGE_ACCOUNT_NAME="mystorageaccount"
+
+# Get all containers in the storage account
+containers=$(az storage container list --account-name $STORAGE_ACCOUNT_NAME --query "[].name" -o tsv)
+
+for container in $containers; do
+    echo "Deleting container: $container"
+    az storage container delete --name $container --account-name $STORAGE_ACCOUNT_NAME --yes
+done
